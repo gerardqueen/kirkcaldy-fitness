@@ -56,6 +56,9 @@ const POSITIONS = [
   "Outside Centre","Left Wing","Right Wing","Fullback"
 ];
 
+const ADMINS = ["geed", "brooks11"];
+const isAdmin = (u) => u && ADMINS.includes(u.toLowerCase());
+
 // unit types:
 //   time   -> entered as mm:ss, stored as seconds
 //   sec    -> entered as seconds (e.g. plank), stored as seconds
@@ -321,6 +324,41 @@ function removePhotoFromForm(idx) {
   render();
 }
 
+async function adminDeleteUser(uname) {
+  if (!isAdmin(state.currentUser)) return;
+  if (uname === state.currentUser) { alert("You can't delete your own account while logged in."); return; }
+  if (!confirm(`Delete account "${uname}" and ALL their results, check-ins and photos? This cannot be undone.`)) return;
+  try {
+    // delete entries
+    for (const e of state.entries.filter(x => x.user === uname)) {
+      await deleteDoc(doc(db, "entries", e.id));
+    }
+    // delete check-ins
+    for (const c of state.checkins.filter(x => x.user === uname)) {
+      await deleteDoc(doc(db, "checkins", c.id));
+    }
+    // delete user doc
+    await deleteDoc(doc(db, "users", uname));
+  } catch (e) {
+    alert("Delete failed: " + e.message);
+  }
+}
+
+async function adminResetPassword(uname) {
+  if (!isAdmin(state.currentUser)) return;
+  const np = prompt(`Set a new password for "${uname}":`);
+  if (!np) return;
+  if (np.length < 3) { alert("Too short"); return; }
+  try {
+    const hash = await hashPassword(np);
+    const existing = state.users[uname] || {};
+    await setDoc(doc(db, "users", uname), { ...existing, passHash: hash });
+    alert(`Password for "${uname}" has been reset. Tell them the new password.`);
+  } catch (e) {
+    alert("Reset failed: " + e.message);
+  }
+}
+
 /* ========================================================= */
 /* 7. VIEWS                                                   */
 /* ========================================================= */
@@ -386,7 +424,7 @@ function viewHeader() {
         <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">🏉</div>
         <div>
           <div class="font-bold">Kirkcaldy RFC</div>
-          <div class="text-xs text-slate-400">${esc(state.currentUser)} · ${esc(me.position||"")}</div>
+          <div class="text-xs text-slate-400">${esc(state.currentUser)} · ${esc(me.position||"")}${isAdmin(state.currentUser)?' · <span class="text-amber-400 font-semibold">ADMIN</span>':''}</div>
         </div>
       </div>
       <button data-act="logout" class="text-slate-400 hover:text-white text-sm">Logout</button>
@@ -626,15 +664,27 @@ function viewBoard() {
 function viewTeam() {
   const names = Object.keys(state.users);
   if (!names.length) return `<p class="text-slate-400">No players yet.</p>`;
+  const admin = isAdmin(state.currentUser);
   return `
-    <h2 class="text-xl font-bold mb-4">Squad (${names.length})</h2>
+    <h2 class="text-xl font-bold mb-4">Squad (${names.length})${admin?' <span class="text-xs text-amber-400 ml-2">admin controls enabled</span>':''}</h2>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
       ${names.map(n => {
         const count = state.entries.filter(e => e.user === n).length;
+        const ciCount = state.checkins.filter(c => c.user === n).length;
+        const isMe = n === state.currentUser;
         return `<div class="card p-4">
-          <div class="font-semibold">${esc(n)}</div>
-          <div class="text-sm text-slate-400">${esc(state.users[n].position||"")}</div>
-          <div class="text-xs text-slate-500 mt-2">${count} result${count!==1?'s':''} logged</div>
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-semibold">${esc(n)}${isAdmin(n)?' <span class="text-[10px] text-amber-400">ADMIN</span>':''}</div>
+              <div class="text-sm text-slate-400">${esc(state.users[n].position||"")}</div>
+            </div>
+          </div>
+          <div class="text-xs text-slate-500 mt-2">${count} result${count!==1?'s':''} · ${ciCount} check-in${ciCount!==1?'s':''}</div>
+          ${admin ? `
+            <div class="flex gap-2 mt-3 pt-3 border-t border-slate-800">
+              <button data-act="admin-reset" data-user="${esc(n)}" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Reset password</button>
+              ${!isMe ? `<button data-act="admin-del-user" data-user="${esc(n)}" class="text-xs bg-red-900 hover:bg-red-800 text-red-200 px-2 py-1 rounded">Delete account</button>` : ''}
+            </div>` : ''}
         </div>`;
       }).join("")}
     </div>`;
@@ -686,6 +736,8 @@ document.addEventListener("click", e => {
     if (ci) { state.lightbox = ci.photos[parseInt(b.dataset.src,10)]; render(); }
   }
   if (a === "close-lightbox") { state.lightbox = null; render(); }
+  if (a === "admin-reset")    adminResetPassword(b.dataset.user);
+  if (a === "admin-del-user") adminDeleteUser(b.dataset.user);
 });
 
 document.addEventListener("change", e => {
