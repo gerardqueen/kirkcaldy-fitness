@@ -61,54 +61,19 @@ const POSITIONS = [
 //   sec    -> entered as seconds (e.g. plank), stored as seconds
 //   kg / cm / m / reps / level -> plain numbers
 const TESTS = [
-  // --- Aerobic / Conditioning ---
-  { k:"bronco",      label:"Bronco Test",            cat:"Conditioning", unit:"time", lowerBetter:true  },
-  { k:"run2k",       label:"2k Run",                 cat:"Conditioning", unit:"time", lowerBetter:true  },
-  { k:"run5k",       label:"5k Run",                 cat:"Conditioning", unit:"time", lowerBetter:true  },
-  { k:"run15mile",   label:"1.5 Mile Run",           cat:"Conditioning", unit:"time", lowerBetter:true  },
-  { k:"row2k",       label:"2k Row",                 cat:"Conditioning", unit:"time", lowerBetter:true  },
-  { k:"row500",      label:"500m Row",               cat:"Conditioning", unit:"time", lowerBetter:true  },
-  { k:"yoyo",        label:"Yo-Yo IR1 (distance)",   cat:"Conditioning", unit:"m",    lowerBetter:false },
-  { k:"beep",        label:"Beep Test (level)",      cat:"Conditioning", unit:"level",lowerBetter:false },
-  { k:"ift3015",     label:"30-15 IFT (km/h)",       cat:"Conditioning", unit:"kmh",  lowerBetter:false },
-  { k:"shuttle1200", label:"1200m Shuttle",          cat:"Conditioning", unit:"time", lowerBetter:true  },
+  // --- Conditioning ---
+  { k:"bronco",   label:"Bronco Test", cat:"Conditioning", unit:"time", lowerBetter:true },
+  { k:"run5k",    label:"5k Run",      cat:"Conditioning", unit:"time", lowerBetter:true },
+  { k:"run10k",   label:"10k Run",     cat:"Conditioning", unit:"time", lowerBetter:true },
+  { k:"row2k",    label:"2k Row",      cat:"Conditioning", unit:"time", lowerBetter:true },
+  { k:"row5k",    label:"5k Row",      cat:"Conditioning", unit:"time", lowerBetter:true },
 
-  // --- Speed & Agility ---
-  { k:"sprint10",    label:"10m Sprint",             cat:"Speed & Agility", unit:"sec", lowerBetter:true },
-  { k:"sprint20",    label:"20m Sprint",             cat:"Speed & Agility", unit:"sec", lowerBetter:true },
-  { k:"sprint40",    label:"40m Sprint",             cat:"Speed & Agility", unit:"sec", lowerBetter:true },
-  { k:"agility505",  label:"5-0-5 Agility",          cat:"Speed & Agility", unit:"sec", lowerBetter:true },
-  { k:"illinois",    label:"Illinois Agility",       cat:"Speed & Agility", unit:"sec", lowerBetter:true },
-  { k:"ttest",       label:"T-Test Agility",         cat:"Speed & Agility", unit:"sec", lowerBetter:true },
-
-  // --- Power ---
-  { k:"cmj",         label:"Countermovement Jump",   cat:"Power", unit:"cm", lowerBetter:false },
-  { k:"vertical",    label:"Vertical Jump",          cat:"Power", unit:"cm", lowerBetter:false },
-  { k:"broadjump",   label:"Broad Jump",             cat:"Power", unit:"cm", lowerBetter:false },
-  { k:"mbthrow",     label:"Medicine Ball Throw",    cat:"Power", unit:"m",  lowerBetter:false },
-
-  // --- Strength 1RM ---
-  { k:"bench1rm",    label:"Bench Press 1RM",        cat:"Strength", unit:"kg", lowerBetter:false },
-  { k:"squat1rm",    label:"Back Squat 1RM",         cat:"Strength", unit:"kg", lowerBetter:false },
-  { k:"front1rm",    label:"Front Squat 1RM",        cat:"Strength", unit:"kg", lowerBetter:false },
-  { k:"dead1rm",     label:"Deadlift 1RM",           cat:"Strength", unit:"kg", lowerBetter:false },
-  { k:"clean1rm",    label:"Power Clean 1RM",        cat:"Strength", unit:"kg", lowerBetter:false },
-  { k:"ohp1rm",      label:"Overhead Press 1RM",     cat:"Strength", unit:"kg", lowerBetter:false },
-  { k:"chin1rm",     label:"Weighted Chin-up (added kg)", cat:"Strength", unit:"kg", lowerBetter:false },
-
-  // --- Muscular Endurance ---
-  { k:"pressups",    label:"Max Press-ups (2 min)",  cat:"Endurance", unit:"reps", lowerBetter:false },
-  { k:"chinups",     label:"Max Chin-ups",           cat:"Endurance", unit:"reps", lowerBetter:false },
-  { k:"pullups",     label:"Max Pull-ups",           cat:"Endurance", unit:"reps", lowerBetter:false },
-  { k:"situps",      label:"Max Sit-ups (2 min)",    cat:"Endurance", unit:"reps", lowerBetter:false },
-  { k:"dips",        label:"Max Dips",               cat:"Endurance", unit:"reps", lowerBetter:false },
-  { k:"plank",       label:"Plank Hold",             cat:"Endurance", unit:"sec",  lowerBetter:false },
-  { k:"wallsit",     label:"Wall Sit",               cat:"Endurance", unit:"sec",  lowerBetter:false },
-
-  // --- Body & Flexibility ---
-  { k:"bodyweight",  label:"Body Weight",            cat:"Body & Flexibility", unit:"kg", lowerBetter:false },
-  { k:"bodyfat",     label:"Body Fat %",             cat:"Body & Flexibility", unit:"pct",lowerBetter:true  },
-  { k:"sitreach",    label:"Sit & Reach",            cat:"Body & Flexibility", unit:"cm", lowerBetter:false },
+  // --- Strength (1RM) ---
+  { k:"bench1rm",   label:"Bench Press 1RM", cat:"Strength", unit:"kg", lowerBetter:false },
+  { k:"squat1rm",   label:"Back Squat 1RM",  cat:"Strength", unit:"kg", lowerBetter:false },
+  { k:"front1rm",   label:"Front Squat 1RM", cat:"Strength", unit:"kg", lowerBetter:false },
+  { k:"dead1rm",    label:"Deadlift 1RM",    cat:"Strength", unit:"kg", lowerBetter:false },
+  { k:"pushpress1rm", label:"Push Press 1RM", cat:"Strength", unit:"kg", lowerBetter:false },
 ];
 
 const UNIT_LABEL = {
