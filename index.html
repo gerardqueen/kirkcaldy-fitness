@@ -58,6 +58,14 @@ const POSITIONS = [
 
 const ADMINS = ["geed", "brooks11", "quinny"];
 const isAdmin = (u) => u && ADMINS.includes(u.toLowerCase());
+const getClass = (u) => (state.users[u] && state.users[u].classification) || "senior";
+const isJunior = (u) => getClass(u) === "junior";
+
+// Strength test labels adapt: seniors see 1RM, juniors see 5RM
+function testLabel(t, classification) {
+  if (t.cat === "Strength") return t.label.replace("1RM", classification === "junior" ? "5RM" : "1RM");
+  return t.label;
+}
 
 // unit types:
 //   time   -> entered as mm:ss, stored as seconds
@@ -225,10 +233,11 @@ async function doAuth() {
   try {
     if (state.authMode === "signup") {
       const pos = $("#f-pos").value;
+      const cls = $("#f-class").value;
       const ref = doc(db, "users", uname);
       const existing = await getDoc(ref);
       if (existing.exists()) { state.authErr = "Username already taken"; render(); return; }
-      await setDoc(ref, { position: pos, passHash: hash });
+      await setDoc(ref, { position: pos, passHash: hash, classification: cls });
       state.currentUser = uname;
     } else {
       const ref = doc(db, "users", uname);
@@ -310,7 +319,7 @@ async function saveCheckin() {
       user: state.currentUser,
       position: state.users[state.currentUser].position,
       date, weight, notes,
-      photos: state.checkinForm.photos,
+      photos: isJunior(state.currentUser) ? [] : state.checkinForm.photos,
     });
     state.checkinForm = { date:new Date().toISOString().slice(0,10), weight:"", notes:"", photos:[] };
   } catch (e) {
@@ -400,7 +409,11 @@ function viewAuth() {
       <div class="space-y-3">
         <input id="f-user" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2" placeholder="Username" autocomplete="username"/>
         <input id="f-pass" type="password" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2" placeholder="Password" autocomplete="${isSignup?'new-password':'current-password'}"/>
-        ${isSignup ? `<select id="f-pos" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">${POSITIONS.map(p=>`<option>${p}</option>`).join("")}</select>` : ""}
+        ${isSignup ? `<select id="f-pos" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">${POSITIONS.map(p=>`<option>${p}</option>`).join("")}</select>
+        <select id="f-class" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+          <option value="senior">Senior</option>
+          <option value="junior">Junior</option>
+        </select>` : ""}
         ${state.authErr ? `<div class="text-red-400 text-sm">${esc(state.authErr)}</div>` : ""}
         <button data-act="auth" class="w-full bg-blue-600 hover:bg-blue-500 py-2.5 rounded-lg font-semibold">${isSignup?'Create account':'Log in'}</button>
         <p class="text-xs text-slate-500 text-center">Passwords are hashed, but don't reuse a real one.</p>
@@ -425,7 +438,7 @@ function viewHeader() {
         <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">🏉</div>
         <div>
           <div class="font-bold">Kirkcaldy RFC</div>
-          <div class="text-xs text-slate-400">${esc(state.currentUser)} · ${esc(me.position||"")}${isAdmin(state.currentUser)?' · <span class="text-amber-400 font-semibold">ADMIN</span>':''}</div>
+          <div class="text-xs text-slate-400">${esc(state.currentUser)} · ${esc(me.position||"")} · <span class="${isJunior(state.currentUser)?'text-green-400':'text-slate-300'}">${getClass(state.currentUser).toUpperCase()}</span>${isAdmin(state.currentUser)?' · <span class="text-amber-400 font-semibold">ADMIN</span>':''}</div>
         </div>
       </div>
       <button data-act="logout" class="text-slate-400 hover:text-white text-sm">Logout</button>
@@ -438,10 +451,11 @@ function viewHeader() {
 
 function viewLog() {
   const test = TESTS.find(t => t.k === state.entryForm.test);
+  const cls = getClass(state.currentUser);
   const optsByCat = {};
   TESTS.forEach(t => { (optsByCat[t.cat] = optsByCat[t.cat] || []).push(t); });
   const optsHtml = Object.entries(optsByCat).map(([cat, arr]) =>
-    `<optgroup label="${cat}">${arr.map(t=>`<option value="${t.k}" ${t.k===state.entryForm.test?'selected':''}>${t.label}</option>`).join("")}</optgroup>`
+    `<optgroup label="${cat==='Strength'?(cls==='junior'?'Strength (5RM)':'Strength (1RM)'):cat}">${arr.map(t=>`<option value="${t.k}" ${t.k===state.entryForm.test?'selected':''}>${testLabel(t,cls)}</option>`).join("")}</optgroup>`
   ).join("");
   return `
   <div class="card p-6 max-w-lg">
@@ -467,7 +481,8 @@ function viewLog() {
 function viewCheckin() {
   const myCheckins = state.checkins.filter(c => c.user === state.currentUser).slice().sort((a,b) => b.date.localeCompare(a.date));
   const f = state.checkinForm;
-  const photoThumbs = f.photos.map((p,i) =>
+  const junior = isJunior(state.currentUser);
+  const photoThumbs = junior ? "" : f.photos.map((p,i) =>
     `<div class="relative inline-block mr-2 mb-2">
        <img src="${p}" class="w-20 h-20 object-cover rounded-lg border border-slate-700"/>
        <button data-act="rm-photo" data-idx="${i}" class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-600 text-white text-xs font-bold">×</button>
@@ -486,8 +501,16 @@ function viewCheckin() {
             <button data-act="del-checkin" data-id="${c.id}" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
           </div>
           ${c.notes ? `<p class="text-sm text-slate-300 mb-3">${esc(c.notes)}</p>` : ""}
-          ${(c.photos||[]).length ? `<div class="flex flex-wrap gap-2">${c.photos.map((p,i)=>`<img src="${p}" data-act="lightbox" data-src="${i}" data-checkin="${c.id}" class="w-24 h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 border border-slate-700"/>`).join("")}</div>` : ""}
+          ${!junior && (c.photos||[]).length ? `<div class="flex flex-wrap gap-2">${c.photos.map((p,i)=>`<img src="${p}" data-act="lightbox" data-src="${i}" data-checkin="${c.id}" class="w-24 h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 border border-slate-700"/>`).join("")}</div>` : ""}
         </div>`).join("");
+
+  const photoSection = junior ? "" : `
+          <div>
+            <label class="text-xs text-slate-400">Photos (up to 4 — front, side, back, etc.)</label>
+            <div class="mt-2">${photoThumbs}</div>
+            <input type="file" accept="image/*" multiple data-act="photo-input" class="block w-full text-sm text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white file:cursor-pointer mt-1" ${f.photos.length>=4?'disabled':''}/>
+            <p class="text-xs text-slate-500 mt-1">Photos are resized & compressed automatically.</p>
+          </div>`;
 
   return `
     <div class="space-y-4">
@@ -506,12 +529,7 @@ function viewCheckin() {
             <label class="text-xs text-slate-400">Notes (optional)</label>
             <textarea id="c-notes" rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 mt-1" placeholder="How you're feeling, sleep, training load…">${esc(f.notes)}</textarea>
           </div>
-          <div>
-            <label class="text-xs text-slate-400">Photos (up to 4 — front, side, back, etc.)</label>
-            <div class="mt-2">${photoThumbs}</div>
-            <input type="file" accept="image/*" multiple data-act="photo-input" class="block w-full text-sm text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white file:cursor-pointer mt-1" ${f.photos.length>=4?'disabled':''}/>
-            <p class="text-xs text-slate-500 mt-1">Photos are resized & compressed automatically.</p>
-          </div>
+          ${photoSection}
           <button data-act="save-checkin" ${state.checkinSaving?'disabled':''} class="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 py-2.5 rounded-lg font-semibold">${state.checkinSaving?'Saving…':'Save check-in'}</button>
         </div>
       </div>
@@ -551,6 +569,7 @@ function viewMe() {
 
   if (!myEntries.length && !myCheckins.length) return `<p class="text-slate-400">No results logged yet. Head to the Log or Check-in tab.</p>`;
 
+  const myCls = getClass(state.currentUser);
   const byTest = {};
   myEntries.forEach(e => { (byTest[e.test] = byTest[e.test] || []).push(e); });
   const cards = Object.entries(byTest).map(([tk, arr]) => {
@@ -560,7 +579,7 @@ function viewMe() {
     return `
       <div class="card p-5">
         <div class="flex justify-between items-center mb-3">
-          <h3 class="font-semibold">${t.label}</h3>
+          <h3 class="font-semibold">${testLabel(t,myCls)}</h3>
           <span class="text-sm text-slate-400">Best: <span class="text-white font-mono">${fmtValue(t,best)}</span></span>
         </div>
         <div style="height:180px;position:relative"><canvas id="chart-${tk}"></canvas></div>
@@ -577,7 +596,7 @@ function viewMe() {
           const t = TESTS.find(x=>x.k===e.test);
           return `<div class="flex items-center justify-between py-2">
             <div>
-              <div class="font-medium">${t ? esc(t.label) : esc(e.test)}</div>
+              <div class="font-medium">${t ? esc(testLabel(t,myCls)) : esc(e.test)}</div>
               <div class="text-xs text-slate-500">${esc(e.date)}</div>
             </div>
             <div class="flex items-center gap-3">
@@ -620,7 +639,10 @@ function viewMe() {
 
 function viewBoard() {
   const test = TESTS.find(t => t.k === state.filterTest) || TESTS[0];
-  const rows = state.entries.filter(e => e.test === state.filterTest && (state.filterPos === "All" || e.position === state.filterPos));
+  const myCls = getClass(state.currentUser);
+  // only show players in same classification
+  const sameClassUsers = Object.entries(state.users).filter(([u,d]) => (d.classification || "senior") === myCls).map(([u])=>u);
+  const rows = state.entries.filter(e => e.test === state.filterTest && sameClassUsers.includes(e.user) && (state.filterPos === "All" || e.position === state.filterPos));
   const bestByUser = {};
   rows.forEach(e => {
     const cur = bestByUser[e.user];
@@ -631,7 +653,7 @@ function viewBoard() {
   const optsByCat = {};
   TESTS.forEach(t => { (optsByCat[t.cat] = optsByCat[t.cat] || []).push(t); });
   const testOpts = Object.entries(optsByCat).map(([cat,arr]) =>
-    `<optgroup label="${cat}">${arr.map(t=>`<option value="${t.k}" ${t.k===state.filterTest?'selected':''}>${t.label}</option>`).join("")}</optgroup>`
+    `<optgroup label="${cat==='Strength'?(myCls==='junior'?'Strength (5RM)':'Strength (1RM)'):cat}">${arr.map(t=>`<option value="${t.k}" ${t.k===state.filterTest?'selected':''}>${testLabel(t,myCls)}</option>`).join("")}</optgroup>`
   ).join("");
   const posOpts = `<option>All</option>${POSITIONS.map(p=>`<option ${p===state.filterPos?'selected':''}>${p}</option>`).join("")}`;
 
@@ -654,7 +676,7 @@ function viewBoard() {
       </table>`;
 
   return `
-    <h2 class="text-xl font-bold mb-4">Leaderboard</h2>
+    <h2 class="text-xl font-bold mb-4">Leaderboard <span class="text-sm font-normal ${myCls==='junior'?'text-green-400':'text-slate-400'}">(${myCls === 'junior' ? 'Juniors' : 'Seniors'})</span></h2>
     <div class="flex flex-wrap gap-3 mb-4">
       <select data-act="filter-test" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">${testOpts}</select>
       <select data-act="filter-pos"  class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">${posOpts}</select>
@@ -695,6 +717,7 @@ function viewPlayerDetail() {
   }
 
   // test charts
+  const playerCls = getClass(uname);
   const byTest = {};
   pEntries.forEach(e => { (byTest[e.test] = byTest[e.test] || []).push(e); });
   const testCards = Object.entries(byTest).map(([tk, arr]) => {
@@ -704,7 +727,7 @@ function viewPlayerDetail() {
     return `
       <div class="card p-5">
         <div class="flex justify-between items-center mb-3">
-          <h3 class="font-semibold">${t.label}</h3>
+          <h3 class="font-semibold">${testLabel(t,playerCls)}</h3>
           <span class="text-sm text-slate-400">Best: <span class="text-white font-mono">${fmtValue(t,best)}</span></span>
         </div>
         <div style="height:180px;position:relative"><canvas id="pchart-${tk}"></canvas></div>
@@ -721,7 +744,7 @@ function viewPlayerDetail() {
         type: "line",
         data: {
           labels: arr.map(e=>e.date),
-          datasets: [{ label: t.label, data: arr.map(e=>e.value), borderColor:"#3b82f6", backgroundColor:"rgba(59,130,246,0.2)", tension:0.2, fill:true }]
+          datasets: [{ label: testLabel(t,playerCls), data: arr.map(e=>e.value), borderColor:"#3b82f6", backgroundColor:"rgba(59,130,246,0.2)", tension:0.2, fill:true }]
         },
         options: {
           responsive:true, maintainAspectRatio:false,
@@ -745,7 +768,7 @@ function viewPlayerDetail() {
           const t = TESTS.find(x=>x.k===e.test);
           return `<div class="flex items-center justify-between py-2">
             <div>
-              <div class="font-medium">${t ? esc(t.label) : esc(e.test)}</div>
+              <div class="font-medium">${t ? esc(testLabel(t,playerCls)) : esc(e.test)}</div>
               <div class="text-xs text-slate-500">${esc(e.date)}</div>
             </div>
             <div class="flex items-center gap-3">
@@ -776,7 +799,7 @@ function viewPlayerDetail() {
       <button data-act="back-team" class="text-sm text-blue-400 hover:text-blue-300">← Back to team</button>
       <div class="card p-5">
         <h2 class="text-2xl font-bold">${esc(uname)}</h2>
-        <p class="text-slate-400">${esc(u.position||"")}</p>
+        <p class="text-slate-400">${esc(u.position||"")} · <span class="${isJunior(uname)?'text-green-400':'text-slate-300'}">${getClass(uname).toUpperCase()}</span></p>
         <p class="text-xs text-slate-500 mt-1">${pEntries.length} result${pEntries.length!==1?'s':''} · ${pCheckins.length} check-in${pCheckins.length!==1?'s':''}</p>
       </div>
       ${weightCard}
@@ -802,7 +825,7 @@ function viewTeam() {
           <div class="flex justify-between items-start">
             <div>
               <div class="font-semibold">${esc(n)}${isAdmin(n)?' <span class="text-[10px] text-amber-400">ADMIN</span>':''}</div>
-              <div class="text-sm text-slate-400">${esc(state.users[n].position||"")}</div>
+              <div class="text-sm text-slate-400">${esc(state.users[n].position||"")} · <span class="${isJunior(n)?'text-green-400':'text-slate-300'}">${getClass(n)}</span></div>
             </div>
           </div>
           <div class="text-xs text-slate-500 mt-2">${count} result${count!==1?'s':''} · ${ciCount} check-in${ciCount!==1?'s':''}</div>
